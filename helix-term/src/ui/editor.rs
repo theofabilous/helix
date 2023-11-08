@@ -1,5 +1,5 @@
 use crate::{
-    commands::{self, OnKeyCallback},
+    commands::{self, OnKeyCallback, OnMatchCallback},
     compositor::{Component, Context, Event, EventResult},
     job::{self, Callback},
     key,
@@ -39,6 +39,7 @@ use super::{document::LineDecoration, lsp::SignatureHelp};
 pub struct EditorView {
     pub keymaps: Keymaps,
     on_next_key: Option<OnKeyCallback>,
+    on_next_match: Option<OnMatchCallback>,
     pseudo_pending: Vec<KeyEvent>,
     pub(crate) last_insert: (commands::MappableCommand, Vec<InsertEvent>),
     pub(crate) completion: Option<Completion>,
@@ -69,6 +70,7 @@ impl EditorView {
         Self {
             keymaps,
             on_next_key: None,
+            on_next_match: None,
             pseudo_pending: Vec::new(),
             last_insert: (commands::MappableCommand::normal_mode, Vec::new()),
             completion: None,
@@ -1241,6 +1243,8 @@ impl Component for EditorView {
             register: None,
             callback: None,
             on_next_key_callback: None,
+            on_next_match_callback: None,
+            has_pending_key: self.on_next_match.is_some(),
             jobs: context.jobs,
         };
 
@@ -1282,6 +1286,10 @@ impl Component for EditorView {
                 if let Some(on_next_key) = self.on_next_key.take() {
                     // if there's a command waiting input, do that first
                     on_next_key(&mut cx, key);
+                    if let Some(on_next_match) = self.on_next_match.take() {
+                        on_next_match(&mut cx, key);
+                        cx.has_pending_key = false;
+                    }
                 } else {
                     match mode {
                         Mode::Insert => {
@@ -1344,11 +1352,37 @@ impl Component for EditorView {
                     }
                 }
 
-                self.on_next_key = cx.on_next_key_callback.take();
-                match self.on_next_key {
-                    Some(_) => self.pseudo_pending.push(key),
-                    None => self.pseudo_pending.clear(),
-                }
+                self.on_next_match = match (
+                    self.on_next_match.take(),
+                    cx.on_next_key_callback.take(),
+                    cx.on_next_match_callback.take(),
+                ) {
+                    (None, None, None) => {
+                        self.pseudo_pending.clear();
+                        None
+                    }
+                    (Some(on_next_match), None, None) if self.keymaps.pending().is_empty() => {
+                        self.pseudo_pending.clear();
+                        on_next_match(&mut cx, key);
+                        None
+                    }
+                    (Some(on_next_match), None, None) => Some(on_next_match),
+                    (x, y, z) => {
+                        self.pseudo_pending.push(key);
+                        self.on_next_key = y;
+                        match (x, z) {
+                            (None, None) => None,
+                            (on_next_match, None) | (None, on_next_match) => on_next_match,
+                            (Some(on_next_match), Some(cx_on_next_match)) => {
+                                // unreachable?
+                                Some(Box::new(move |cx, key| {
+                                    cx_on_next_match(cx, key);
+                                    on_next_match(cx, key);
+                                }))
+                            }
+                        }
+                    }
+                };
 
                 // appease borrowck
                 let callback = cx.callback.take();
@@ -1460,10 +1494,10 @@ impl Component for EditorView {
             if let Some(count) = cx.editor.count {
                 disp.push_str(&count.to_string())
             }
-            for key in self.keymaps.pending() {
+            for key in &self.pseudo_pending {
                 disp.push_str(&key.key_sequence_format());
             }
-            for key in &self.pseudo_pending {
+            for key in self.keymaps.pending() {
                 disp.push_str(&key.key_sequence_format());
             }
             let style = cx.editor.theme.get("ui.text");

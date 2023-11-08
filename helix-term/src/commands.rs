@@ -76,6 +76,7 @@ use grep_searcher::{sinks, BinaryDetection, SearcherBuilder};
 use ignore::{DirEntry, WalkBuilder, WalkState};
 
 pub type OnKeyCallback = Box<dyn FnOnce(&mut Context, KeyEvent)>;
+pub type OnMatchCallback = Box<dyn FnOnce(&mut Context, KeyEvent)>;
 
 pub struct Context<'a> {
     pub register: Option<char>,
@@ -84,6 +85,8 @@ pub struct Context<'a> {
 
     pub callback: Option<crate::compositor::Callback>,
     pub on_next_key_callback: Option<OnKeyCallback>,
+    pub on_next_match_callback: Option<OnMatchCallback>,
+    pub has_pending_key: bool,
     pub jobs: &'a mut Jobs,
 }
 
@@ -108,6 +111,20 @@ impl<'a> Context<'a> {
         on_next_key_callback: impl FnOnce(&mut Context, KeyEvent) + 'static,
     ) {
         self.on_next_key_callback = Some(Box::new(on_next_key_callback));
+    }
+
+    #[inline]
+    pub fn on_next_match(
+        &mut self,
+        on_next_match_callback: impl FnOnce(&mut Context, KeyEvent) + 'static,
+    ) -> Result<(), ()> {
+        if self.has_pending_key {
+            Err(())
+        } else {
+            self.on_next_match_callback = Some(Box::new(on_next_match_callback));
+            self.has_pending_key = true;
+            Ok(())
+        }
     }
 
     #[inline]
@@ -490,6 +507,11 @@ impl MappableCommand {
         record_macro, "Record macro",
         replay_macro, "Replay macro",
         command_palette, "Open command palette",
+        insert_or_inside, "Insert/inside",
+        append_or_around, "Append/around",
+        vim_yank, "Vim yank",
+        vim_change, "Vim change",
+        vim_delete, "Vim delete",
     );
 }
 
@@ -579,6 +601,26 @@ impl PartialEq for MappableCommand {
             ) => first_name == second_name,
             _ => false,
         }
+    }
+}
+
+fn vim_operator(cx: &mut Context, f: fn(cx: &mut Context)) {
+    let editor = &cx.editor;
+    let focused_view = editor.tree.get(editor.tree.focus);
+    let doc = &editor.documents[&focused_view.doc];
+    let primary_selection = doc.selection(focused_view.id).primary();
+
+    if primary_selection.len() > 1 {
+        f(cx);
+    } else if cx
+        .on_next_match(move |cx, key| {
+            if key.code != KeyCode::Esc {
+                f(cx);
+            }
+        })
+        .is_err()
+    {
+        f(cx);
     }
 }
 
@@ -2541,6 +2583,10 @@ fn delete_by_selection_insert_mode(
     lsp::signature_help_impl(cx, SignatureHelpInvoked::Automatic);
 }
 
+fn vim_delete(cx: &mut Context) {
+    vim_operator(cx, delete_selection)
+}
+
 fn delete_selection(cx: &mut Context) {
     delete_selection_impl(cx, Operation::Delete);
 }
@@ -2548,6 +2594,10 @@ fn delete_selection(cx: &mut Context) {
 fn delete_selection_noyank(cx: &mut Context) {
     cx.register = Some('_');
     delete_selection_impl(cx, Operation::Delete);
+}
+
+fn vim_change(cx: &mut Context) {
+    vim_operator(cx, change_selection)
 }
 
 fn change_selection(cx: &mut Context) {
@@ -2903,6 +2953,8 @@ pub fn command_palette(cx: &mut Context) {
                     editor: cx.editor,
                     callback: None,
                     on_next_key_callback: None,
+                    on_next_match_callback: None,
+                    has_pending_key: false,
                     jobs: cx.jobs,
                 };
                 let focus = view!(ctx.editor).id;
@@ -3890,6 +3942,10 @@ fn commit_undo_checkpoint(cx: &mut Context) {
 }
 
 // Yank / Paste
+
+fn vim_yank(cx: &mut Context) {
+    vim_operator(cx, yank)
+}
 
 fn yank(cx: &mut Context) {
     yank_impl(cx.editor, cx.register.unwrap_or('"'));
@@ -5203,6 +5259,24 @@ fn select_textobject(cx: &mut Context, objtype: textobject::TextObject) {
     ];
 
     cx.editor.autoinfo = Some(Info::new(title, &help_text));
+}
+
+fn select_textobject_if_pending(c: char, cx: &mut Context) {
+    match (c, cx.has_pending_key) {
+        ('i', true) => select_textobject_inner(cx),
+        ('i', false) => insert_mode(cx),
+        ('a', true) => select_textobject_around(cx),
+        ('a', false) => append_mode(cx),
+        _ => (),
+    }
+}
+
+fn insert_or_inside(cx: &mut Context) {
+    select_textobject_if_pending('i', cx)
+}
+
+fn append_or_around(cx: &mut Context) {
+    select_textobject_if_pending('a', cx);
 }
 
 fn surround_add(cx: &mut Context) {
