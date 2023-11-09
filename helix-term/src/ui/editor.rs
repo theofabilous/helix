@@ -1,5 +1,5 @@
 use crate::{
-    commands::{self, OnKeyCallback, OnMatchCallback},
+    commands::{self, OnKeyCallback, OnMatchCallback, OnMatchInput},
     compositor::{Component, Context, Event, EventResult},
     job::{self, Callback},
     key,
@@ -1287,7 +1287,7 @@ impl Component for EditorView {
                     // if there's a command waiting input, do that first
                     on_next_key(&mut cx, key);
                     if let Some(on_next_match) = self.on_next_match.take() {
-                        on_next_match(&mut cx, key);
+                        on_next_match(&mut cx, OnMatchInput::OnKey(key));
                         cx.has_pending_key = false;
                     }
                 } else {
@@ -1363,7 +1363,7 @@ impl Component for EditorView {
                     }
                     (Some(on_next_match), None, None) if self.keymaps.pending().is_empty() => {
                         self.pseudo_pending.clear();
-                        on_next_match(&mut cx, key);
+                        on_next_match(&mut cx, OnMatchInput::Mapping(key));
                         None
                     }
                     (Some(on_next_match), None, None) => Some(on_next_match),

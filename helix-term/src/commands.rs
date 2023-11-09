@@ -75,8 +75,14 @@ use grep_regex::RegexMatcherBuilder;
 use grep_searcher::{sinks, BinaryDetection, SearcherBuilder};
 use ignore::{DirEntry, WalkBuilder, WalkState};
 
+#[derive(Clone, Copy)]
+pub enum OnMatchInput {
+    OnKey(KeyEvent),
+    Mapping(KeyEvent),
+}
+
 pub type OnKeyCallback = Box<dyn FnOnce(&mut Context, KeyEvent)>;
-pub type OnMatchCallback = Box<dyn FnOnce(&mut Context, KeyEvent)>;
+pub type OnMatchCallback = Box<dyn FnOnce(&mut Context, OnMatchInput)>;
 
 pub struct Context<'a> {
     pub register: Option<char>,
@@ -116,7 +122,7 @@ impl<'a> Context<'a> {
     #[inline]
     pub fn on_next_match(
         &mut self,
-        on_next_match_callback: impl FnOnce(&mut Context, KeyEvent) + 'static,
+        on_next_match_callback: impl FnOnce(&mut Context, OnMatchInput) + 'static,
     ) -> Result<(), ()> {
         if self.has_pending_key {
             Err(())
@@ -613,11 +619,20 @@ fn vim_operator(cx: &mut Context, f: fn(cx: &mut Context)) {
     if primary_selection.len() > 1 {
         f(cx);
     } else if cx
-        .on_next_match(move |cx, key| {
-            if key.code != KeyCode::Esc {
-                f(cx);
-            }
+        .on_next_match(move |cx, e| match e {
+            OnMatchInput::OnKey(KeyEvent {
+                code: KeyCode::Esc, ..
+            }) => (),
+            OnMatchInput::Mapping(KeyEvent {
+                code: KeyCode::Char(':') | KeyCode::Esc,
+                ..
+            }) => (),
+            _ => f(cx),
         })
+        // .on_next_match(move |cx, key| match key.code {
+        //     KeyCode::Esc | KeyCode::Char(':') => (),
+        //     _ => f(cx),
+        // })
         .is_err()
     {
         f(cx);
