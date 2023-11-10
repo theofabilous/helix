@@ -1281,7 +1281,7 @@ impl Editor {
             }
         }
 
-        for (view, _) in self.tabs.views_mut() {
+        for (view, _) in self.tabs.all_views_mut() {
             let doc = doc_mut!(self, &view.doc);
             view.sync_changes(doc);
             view.gutters = config.gutters.clone();
@@ -1342,7 +1342,7 @@ impl Editor {
                     self.documents.remove(&id);
 
                     // Remove the scratch buffer from any jumplists
-                    for (view, _) in self.tabs.views_mut() {
+                    for (view, _) in self.tabs.curr().views_mut() {
                         view.remove_document(&id);
                     }
                 } else {
@@ -1508,7 +1508,7 @@ impl Editor {
 
         let actions: Vec<Action> = self
             .tabs
-            .views_mut()
+            .all_views_mut()
             .filter_map(|(view, _focus)| {
                 view.remove_document(&doc_id);
 
@@ -1542,7 +1542,7 @@ impl Editor {
         // If the document we removed was visible in all views, we will have no more views. We don't
         // want to close the editor just for a simple buffer close, so we need to create a new view
         // containing either an existing document, or a brand new document.
-        if self.tabs.views().next().is_none() {
+        if self.tabs.all_views().next().is_none() {
             let doc_id = self
                 .documents
                 .iter()

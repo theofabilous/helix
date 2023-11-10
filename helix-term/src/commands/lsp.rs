@@ -1499,7 +1499,8 @@ pub fn compute_inlay_hints_for_all_views(editor: &mut Editor, jobs: &mut crate::
         return;
     }
 
-    for (view, _) in editor.tabs.views() {
+    // TODO(theofabilous): really for all views, or just current tab?
+    for (view, _) in editor.tabs.all_views() {
         let doc = match editor.documents.get(&view.doc) {
             Some(doc) => doc,
             None => continue,

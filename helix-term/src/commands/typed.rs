@@ -74,8 +74,9 @@ fn quit(cx: &mut compositor::Context, args: &[Cow<str>], event: PromptEvent) -> 
 
     ensure!(args.is_empty(), ":quit takes no arguments");
 
+    // TODO(theofabilous): handle tabs, etc..
     // last view and we have unsaved changes
-    if cx.editor.tabs.views().count() == 1 {
+    if cx.editor.tabs.all_views().count() == 1 {
         buffers_remaining_impl(cx.editor)?
     }
 
@@ -800,7 +801,12 @@ fn quit_all_impl(cx: &mut compositor::Context, force: bool) -> anyhow::Result<()
     }
 
     // close all views
-    let views: Vec<_> = cx.editor.tabs.views().map(|(view, _)| view.id).collect();
+    let views: Vec<_> = cx
+        .editor
+        .tabs
+        .all_views()
+        .map(|(view, _)| view.id)
+        .collect();
     for view_id in views {
         cx.editor.close(view_id);
     }
@@ -1618,6 +1624,35 @@ fn tree_sitter_highlight_name(
     };
 
     cx.jobs.callback(callback);
+
+    Ok(())
+}
+
+fn tab_new(
+    cx: &mut compositor::Context,
+    _args: &[Cow<str>],
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    if event != PromptEvent::Validate {
+        return Ok(());
+    }
+
+    _ = cx.editor.tabs.new_tab();
+    cx.editor.new_file(Action::VerticalSplit);
+
+    Ok(())
+}
+
+fn tab_next(
+    cx: &mut compositor::Context,
+    _args: &[Cow<str>],
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    if event != PromptEvent::Validate {
+        return Ok(());
+    }
+
+    _ = cx.editor.tabs.focus_next();
 
     Ok(())
 }
@@ -2898,6 +2933,20 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         aliases: &[],
         doc: "Evaluate expression in current debug context.",
         fun: debug_eval,
+        signature: CommandSignature::none(),
+    },
+    TypableCommand {
+        name: "tab-new",
+        aliases: &["tnew"],
+        doc: "Create a new tab.",
+        fun: tab_new,
+        signature: CommandSignature::none(),
+    },
+    TypableCommand {
+        name: "tab-next",
+        aliases: &["tnext"],
+        doc: "Goto the next tab.",
+        fun: tab_next,
         signature: CommandSignature::none(),
     },
     TypableCommand {

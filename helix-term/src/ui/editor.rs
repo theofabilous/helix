@@ -1050,22 +1050,28 @@ impl EditorView {
         } = *event;
 
         let pos_and_view = |editor: &Editor, row, column, ignore_virtual_text| {
-            editor.tabs.views().find_map(|(view, _focus)| {
-                view.pos_at_screen_coords(
-                    &editor.documents[&view.doc],
-                    row,
-                    column,
-                    ignore_virtual_text,
-                )
-                .map(|pos| (pos, view.id))
-            })
+            editor
+                .tabs
+                .tab_views(editor.tabs.focus)
+                .find_map(|(view, _focus)| {
+                    view.pos_at_screen_coords(
+                        &editor.documents[&view.doc],
+                        row,
+                        column,
+                        ignore_virtual_text,
+                    )
+                    .map(|pos| (pos, view.id))
+                })
         };
 
         let gutter_coords_and_view = |editor: &Editor, row, column| {
-            editor.tabs.views().find_map(|(view, _focus)| {
-                view.gutter_coords_at_screen_coords(row, column)
-                    .map(|coords| (coords, view.id))
-            })
+            editor
+                .tabs
+                .tab_views(editor.tabs.focus)
+                .find_map(|(view, _focus)| {
+                    view.gutter_coords_at_screen_coords(row, column)
+                        .map(|coords| (coords, view.id))
+                })
         };
 
         match kind {
@@ -1427,7 +1433,7 @@ impl Component for EditorView {
             Self::render_bufferline(cx.editor, area.with_height(1), surface);
         }
 
-        for (view, is_focused) in cx.editor.tabs.views() {
+        for (view, is_focused) in cx.editor.tabs.tab_views(cx.editor.tabs.focus) {
             let doc = cx.editor.document(view.doc).unwrap();
             self.render_view(cx.editor, doc, view, area, surface, is_focused);
         }
