@@ -1,5 +1,5 @@
 use crate::{graphics::Rect, TabId, View, ViewId};
-use slotmap::{sparse_secondary::Keys, HopSlotMap, SparseSecondaryMap};
+use slotmap::{HopSlotMap, SparseSecondaryMap};
 
 #[derive(Debug)]
 pub struct Tabs {
@@ -19,7 +19,6 @@ pub struct Tree {
     // fullscreen: bool,
     pub(self) area: Rect,
 
-    // nodes: HopSlotMap<ViewId, Node>,
     pub(self) nodes: SparseSecondaryMap<ViewId, ()>,
 
     // used for traversals
@@ -220,122 +219,6 @@ pub trait TabMut: Tab {
     }
 }
 
-// impl<'a> TabProxy<'a> {
-//     pub fn new(tabs: &'a mut Tabs, tab: TabId) -> Self {
-//         Self { tabs, tab }
-//     }
-
-//     #[inline(always)]
-//     fn tree(&self) -> &Tree {
-//         self.tabs.get_tree(self.tab)
-//     }
-
-//     #[inline(always)]
-//     fn tree_mut(&mut self) -> &mut Tree {
-//         self.tabs.get_tree_mut(self.tab)
-//     }
-
-//     #[inline(always)]
-//     pub fn focused(&self) -> ViewId {
-//         self.tree().focus
-//     }
-
-//     #[inline(always)]
-//     pub fn set_focused(&mut self, index: ViewId) {
-//         self.tree_mut().focus = index;
-//     }
-
-//     #[inline(always)]
-//     pub fn insert(&mut self, view: View) -> ViewId {
-//         self.tabs.insert(self.tab, view)
-//     }
-
-//     #[inline(always)]
-//     pub fn split(&mut self, view: View, layout: Layout) -> ViewId {
-//         self.tabs.split(self.tab, view, layout)
-//     }
-
-//     #[inline(always)]
-//     pub fn remove(&mut self, index: ViewId) {
-//         self.tabs.remove(self.tab, index)
-//     }
-
-//     #[inline(always)]
-//     pub fn views(&self) -> impl Iterator<Item = (&View, bool)> {
-//         self.tabs.tab_views(self.tab)
-//     }
-
-//     #[inline(always)]
-//     pub fn views_mut(&mut self) -> impl Iterator<Item = (&mut View, bool)> {
-//         self.tabs.tab_views_mut(self.tab)
-//     }
-
-//     #[inline(always)]
-//     pub fn get_focused(&self) -> &View {
-//         self.get(self.focused())
-//     }
-
-//     #[inline(always)]
-//     pub fn get(&self, index: ViewId) -> &View {
-//         self.try_get(index).unwrap()
-//     }
-
-//     #[inline(always)]
-//     pub fn try_get(&self, index: ViewId) -> Option<&View> {
-//         self.tabs.try_get(index)
-//     }
-
-//     #[inline(always)]
-//     pub fn get_mut(&mut self, index: ViewId) -> &mut View {
-//         self.tabs.get_mut(index)
-//     }
-
-//     #[inline(always)]
-//     pub fn contains(&self, index: ViewId) -> bool {
-//         self.tabs.tab_contains(self.tab, index).unwrap()
-//     }
-
-//     #[inline(always)]
-//     pub fn is_empty(&self) -> bool {
-//         self.tabs.tab_is_empty(self.tab)
-//     }
-
-//     #[inline(always)]
-//     pub fn resize(&mut self, area: Rect) -> bool {
-//         self.tabs.resize_tab(self.tab, area)
-//     }
-
-//     #[inline(always)]
-//     pub fn recalculate(&mut self) {
-//         self.tabs.recalculate_tab(self.tab)
-//     }
-
-//     #[inline(always)]
-//     pub fn find_split_in_direction(&self, id: ViewId, direction: Direction) -> Option<ViewId> {
-//         self.tabs.find_split_in_direction(self.tab, id, direction)
-//     }
-
-//     #[inline(always)]
-//     pub fn prev(&self) -> ViewId {
-//         self.tabs.prev(self.tab)
-//     }
-
-//     #[inline(always)]
-//     pub fn next(&self) -> ViewId {
-//         self.tabs.next(self.tab)
-//     }
-
-//     #[inline(always)]
-//     pub fn transpose(&mut self) {
-//         self.tabs.transpose(self.tab)
-//     }
-
-//     #[inline(always)]
-//     pub fn swap_split_in_direction(&mut self, direction: Direction) -> Option<()> {
-//         self.tabs.swap_split_in_direction(self.tab, direction)
-//     }
-// }
-
 impl<'a> Tab for TabProxy<'a> {
     #[inline(always)]
     fn tab_id(&self) -> TabId {
@@ -367,6 +250,7 @@ impl<'a> TabMut for TabProxyMut<'a> {
     }
 }
 
+// impl trait return types can't be used in traits..
 impl<'a> TabProxy<'a> {
     #[inline(always)]
     pub fn views(&self) -> impl Iterator<Item = (&View, bool)> {
@@ -387,7 +271,6 @@ impl Tabs {
         let root = Node::container(Layout::Vertical);
         let root = self.nodes.insert(root);
         self.nodes[root].parent = root;
-        // let tree_nodes = SparseSecondaryMap::new();
 
         let mut tree = Tree {
             id: TabId::default(),
@@ -1264,8 +1147,6 @@ mod test {
             height: 80,
         });
         let mut tree = tabs.curr_mut();
-        // let focus = tabs.focus;
-        // let mut tree = TabDelegate::new(&mut tabs, focus);
         let mut view = View::new(DocumentId::default(), GutterConfig::default());
         view.area = Rect::new(0, 0, 180, 80);
         tree.insert(view);
@@ -1325,30 +1206,21 @@ mod test {
         let mut view = View::new(doc_l0, GutterConfig::default());
         view.area = Rect::new(0, 0, 180, 80);
         let mut tree = tabs.curr_mut();
-        // let focus = tabs.focus;
-        // let mut tree = TabDelegate::new(&mut tabs, focus);
         tree.insert(view);
-        // tabs.insert(tabs.focus, view);
-        // tree.insert(view);
         let l0 = tree.focused();
-        // let l0 = tabs.focus;
 
         let doc_r0 = DocumentId::default();
         let view = View::new(doc_r0, GutterConfig::default());
         tree.split(view, Layout::Vertical);
-        // tabs.split(tabs.focus, view, Layout::Vertical);
-        // let r0 = tabs.focus;
         let r0 = tree.focused();
 
         tree.set_focused(l0);
-        // tabs.focus = l0;
 
         let doc_l1 = DocumentId::default();
         let view = View::new(doc_l1, GutterConfig::default());
         tree.split(view, Layout::Horizontal);
         let l1 = tree.focused();
         tree.set_focused(l0);
-        // tree.focus = l0;
 
         let doc_l2 = DocumentId::default();
         let view = View::new(doc_l2, GutterConfig::default());
