@@ -1643,6 +1643,43 @@ fn tab_new(
     Ok(())
 }
 
+fn tab_close(
+    cx: &mut compositor::Context,
+    _args: &[Cow<str>],
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    if event != PromptEvent::Validate {
+        return Ok(());
+    }
+
+    if cx.editor.tabs.len() == 1 {
+        anyhow::bail!("Cannot close only open tab.");
+    }
+    let focus = cx.editor.tabs.focus;
+    // TODO(theofabilous): if the tab only has an empty scratch, remove it?
+    for id in cx.editor.tabs.view_ids(focus) {
+        for doc in cx.editor.documents_mut() {
+            doc.remove_view(id);
+        }
+    }
+    _ = cx.editor.tabs.close_tab(focus);
+    // for id in view_ids {
+    //     for doc in cx.editor.documents_mut() {
+    //         doc.remove_view(id);
+    //     }
+    // }
+    // for id in cx.editor.tabs.iter_view_ids(focus).cloned() {
+    // for (id, _) in cx.editor.tabs.traverse(focus) {
+    //     for doc in cx.editor.documents_mut() {
+    //         doc.remove_view(id);
+    //     }
+    // }
+    // _ = cx.editor.tabs.new_tab();
+    // cx.editor.new_file(Action::VerticalSplit);
+
+    Ok(())
+}
+
 fn tab_next(
     cx: &mut compositor::Context,
     _args: &[Cow<str>],
@@ -2954,6 +2991,13 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         aliases: &["tnew"],
         doc: "Create a new tab.",
         fun: tab_new,
+        signature: CommandSignature::none(),
+    },
+    TypableCommand {
+        name: "tab-close",
+        aliases: &["tclose"],
+        doc: "Close the current tab.",
+        fun: tab_close,
         signature: CommandSignature::none(),
     },
     TypableCommand {
