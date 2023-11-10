@@ -1657,6 +1657,20 @@ fn tab_next(
     Ok(())
 }
 
+fn tab_previous(
+    cx: &mut compositor::Context,
+    _args: &[Cow<str>],
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    if event != PromptEvent::Validate {
+        return Ok(());
+    }
+
+    _ = cx.editor.tabs.focus_previous();
+
+    Ok(())
+}
+
 fn vsplit(
     cx: &mut compositor::Context,
     args: &[Cow<str>],
@@ -2947,6 +2961,13 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         aliases: &["tnext"],
         doc: "Goto the next tab.",
         fun: tab_next,
+        signature: CommandSignature::none(),
+    },
+    TypableCommand {
+        name: "tab-previous",
+        aliases: &["tab-prev", "tprev"],
+        doc: "Goto the previous tab.",
+        fun: tab_previous,
         signature: CommandSignature::none(),
     },
     TypableCommand {
