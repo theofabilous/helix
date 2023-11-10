@@ -267,6 +267,18 @@ impl<'a> TabProxyMut<'a> {
 }
 
 impl Tabs {
+    pub fn new(area: Rect) -> Self {
+        let nodes = HopSlotMap::with_key();
+        let trees = HopSlotMap::with_key();
+        let mut this = Self {
+            focus: TabId::default(),
+            trees,
+            nodes,
+        };
+        this.focus = this.new_tree(area);
+        this
+    }
+
     fn new_tree(&mut self, area: Rect) -> TabId {
         let root = Node::container(Layout::Vertical);
         let root = self.nodes.insert(root);
@@ -322,6 +334,7 @@ impl Tabs {
             })
     }
 
+    #[inline]
     pub fn view_ids(&self, tab: TabId) -> Vec<ViewId> {
         self.iter_view_ids(tab).collect()
     }
@@ -343,60 +356,57 @@ impl Tabs {
         id
     }
 
+    #[inline]
     pub fn iter_tabs(&self) -> impl Iterator<Item = (TabId, &Tree)> {
         self.trees.iter()
     }
 
-    pub fn new(area: Rect) -> Self {
-        let nodes = HopSlotMap::with_key();
-        let trees = HopSlotMap::with_key();
-        let mut this = Self {
-            focus: TabId::default(),
-            trees,
-            nodes,
-        };
-        this.focus = this.new_tree(area);
-        this
-    }
-
+    #[inline]
     pub fn try_get_tree(&self, tab_id: TabId) -> Option<&Tree> {
         self.trees.get(tab_id)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn get_tree(&self, tab_id: TabId) -> &Tree {
         self.try_get_tree(tab_id).unwrap()
     }
 
+    #[inline]
     pub fn try_get_tree_mut(&mut self, tab_id: TabId) -> Option<&mut Tree> {
         self.trees.get_mut(tab_id)
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn get_tree_mut(&mut self, tab_id: TabId) -> &mut Tree {
         self.try_get_tree_mut(tab_id).unwrap()
     }
 
+    #[inline]
     pub fn try_get_focused_view_for_tab(&self, tab: TabId) -> Option<ViewId> {
         Some(self.try_get_tree(tab)?.focus)
     }
 
+    #[inline]
     pub fn get_focused_view_for_tab(&self, tab: TabId) -> ViewId {
         self.get_tree(tab).focus
     }
 
+    #[inline]
     pub fn focused_view(&self) -> ViewId {
         self.get_tree(self.focus).focus
     }
 
+    #[inline]
     pub fn set_focused_view(&mut self, tab: TabId, index: ViewId) {
         self.get_tree_mut(tab).focus = index;
     }
 
+    #[inline]
     pub fn set_focused_view_for_current_tab(&mut self, index: ViewId) {
         self.set_focused_view(self.focus, index)
     }
 
+    #[inline]
     pub fn curr(&self) -> TabProxy {
         let focus = self.focus;
         TabProxy {
@@ -405,6 +415,7 @@ impl Tabs {
         }
     }
 
+    #[inline]
     pub fn curr_mut(&mut self) -> TabProxyMut {
         let focus = self.focus;
         TabProxyMut {
@@ -413,10 +424,12 @@ impl Tabs {
         }
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.trees.len()
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.trees.is_empty()
     }
@@ -835,6 +848,7 @@ impl Tabs {
         self.get_tree_mut(tab).stack = stack;
     }
 
+    #[inline]
     pub fn traverse(&self, tab: TabId) -> Traverse {
         Traverse::new(self, self.get_tree(tab))
     }
@@ -1076,6 +1090,7 @@ impl Tabs {
         }
     }
 
+    #[inline(always)]
     pub fn area(&self, tab: TabId) -> Rect {
         self.get_tree(tab).area
     }
