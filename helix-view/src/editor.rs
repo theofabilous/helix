@@ -1678,7 +1678,7 @@ impl Editor {
     }
 
     pub fn should_close(&self) -> bool {
-        self.tabs.tab_is_empty(self.tabs.focus)
+        self.tabs.all_empty()
     }
 
     pub fn ensure_cursor_in_view(&mut self, id: ViewId) {
