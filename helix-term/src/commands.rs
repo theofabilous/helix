@@ -37,7 +37,7 @@ use helix_view::{
     info::Info,
     input::KeyEvent,
     keyboard::KeyCode,
-    tree,
+    tree::{self, Tab},
     view::View,
     Document, DocumentId, Editor, TabId, ViewId,
 };

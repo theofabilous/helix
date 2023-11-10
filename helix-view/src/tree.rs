@@ -1,5 +1,5 @@
 use crate::{graphics::Rect, TabId, View, ViewId};
-use slotmap::{HopSlotMap, SparseSecondaryMap};
+use slotmap::{sparse_secondary::Keys, HopSlotMap, SparseSecondaryMap};
 
 #[derive(Debug)]
 pub struct Tabs {
@@ -26,7 +26,12 @@ pub struct Tree {
     pub(self) stack: Vec<(ViewId, Rect)>,
 }
 
-pub struct TabDelegate<'a> {
+pub struct TabProxy<'a> {
+    pub(self) tabs: &'a Tabs,
+    pub(self) tab: TabId,
+}
+
+pub struct TabProxyMut<'a> {
     pub(self) tabs: &'a mut Tabs,
     pub(self) tab: TabId,
 }
@@ -97,119 +102,283 @@ impl Default for Container {
     }
 }
 
-impl<'a> TabDelegate<'a> {
-    pub fn new(tabs: &'a mut Tabs, tab: TabId) -> Self {
-        Self { tabs, tab }
-    }
+pub trait Tab {
+    fn tab_id(&self) -> TabId;
+    fn tabs(&self) -> &Tabs;
 
     #[inline(always)]
     fn tree(&self) -> &Tree {
-        self.tabs.get_tree(self.tab)
+        self.tabs().get_tree(self.tab_id())
     }
 
     #[inline(always)]
-    fn tree_mut(&mut self) -> &mut Tree {
-        self.tabs.get_tree_mut(self.tab)
-    }
-
-    #[inline(always)]
-    pub fn focused(&self) -> ViewId {
+    fn focused(&self) -> ViewId {
         self.tree().focus
     }
 
     #[inline(always)]
-    pub fn set_focused(&mut self, index: ViewId) {
-        self.tree_mut().focus = index;
-    }
-
-    #[inline(always)]
-    pub fn insert(&mut self, view: View) -> ViewId {
-        self.tabs.insert(self.tab, view)
-    }
-
-    #[inline(always)]
-    pub fn split(&mut self, view: View, layout: Layout) -> ViewId {
-        self.tabs.split(self.tab, view, layout)
-    }
-
-    #[inline(always)]
-    pub fn remove(&mut self, index: ViewId) {
-        self.tabs.remove(self.tab, index)
-    }
-
-    #[inline(always)]
-    pub fn views(&self) -> impl Iterator<Item = (&View, bool)> {
-        self.tabs.tab_views(self.tab)
-    }
-
-    #[inline(always)]
-    pub fn views_mut(&mut self) -> impl Iterator<Item = (&mut View, bool)> {
-        self.tabs.tab_views_mut(self.tab)
-    }
-
-    #[inline(always)]
-    pub fn get_focused(&self) -> &View {
+    fn get_focused(&self) -> &View {
         self.get(self.focused())
     }
 
     #[inline(always)]
-    pub fn get(&self, index: ViewId) -> &View {
+    fn get(&self, index: ViewId) -> &View {
         self.try_get(index).unwrap()
     }
 
     #[inline(always)]
-    pub fn try_get(&self, index: ViewId) -> Option<&View> {
-        self.tabs.try_get(index)
+    fn try_get(&self, index: ViewId) -> Option<&View> {
+        self.tabs().try_get(index)
     }
 
     #[inline(always)]
-    pub fn get_mut(&mut self, index: ViewId) -> &mut View {
-        self.tabs.get_mut(index)
+    fn contains(&self, index: ViewId) -> bool {
+        self.tabs().tab_contains(self.tab_id(), index).unwrap()
     }
 
     #[inline(always)]
-    pub fn contains(&self, index: ViewId) -> bool {
-        self.tabs.tab_contains(self.tab, index).unwrap()
+    fn is_empty(&self) -> bool {
+        self.tabs().tab_is_empty(self.tab_id())
     }
 
     #[inline(always)]
-    pub fn is_empty(&self) -> bool {
-        self.tabs.tab_is_empty(self.tab)
+    fn find_split_in_direction(&self, id: ViewId, direction: Direction) -> Option<ViewId> {
+        self.tabs()
+            .find_split_in_direction(self.tab_id(), id, direction)
     }
 
     #[inline(always)]
-    pub fn resize(&mut self, area: Rect) -> bool {
-        self.tabs.resize_tab(self.tab, area)
+    fn prev(&self) -> ViewId {
+        self.tabs().prev(self.tab_id())
     }
 
     #[inline(always)]
-    pub fn recalculate(&mut self) {
-        self.tabs.recalculate_tab(self.tab)
+    fn next(&self) -> ViewId {
+        self.tabs().next(self.tab_id())
+    }
+}
+
+pub trait TabMut: Tab {
+    fn tabs_mut(&mut self) -> &mut Tabs;
+
+    #[inline(always)]
+    fn tree_mut<'a>(&'a mut self) -> &'a mut Tree {
+        let tab_id = self.tab_id();
+        self.tabs_mut().get_tree_mut(tab_id)
     }
 
     #[inline(always)]
-    pub fn find_split_in_direction(&self, id: ViewId, direction: Direction) -> Option<ViewId> {
-        self.tabs.find_split_in_direction(self.tab, id, direction)
+    fn set_focused(&mut self, index: ViewId) {
+        self.tree_mut().focus = index;
     }
 
     #[inline(always)]
-    pub fn prev(&self) -> ViewId {
-        self.tabs.prev(self.tab)
+    fn insert(&mut self, view: View) -> ViewId {
+        let tab_id = self.tab_id();
+        self.tabs_mut().insert(tab_id, view)
     }
 
     #[inline(always)]
-    pub fn next(&self) -> ViewId {
-        self.tabs.next(self.tab)
+    fn split(&mut self, view: View, layout: Layout) -> ViewId {
+        let tab_id = self.tab_id();
+        self.tabs_mut().split(tab_id, view, layout)
     }
 
     #[inline(always)]
-    pub fn transpose(&mut self) {
-        self.tabs.transpose(self.tab)
+    fn remove(&mut self, index: ViewId) {
+        let tab_id = self.tab_id();
+        self.tabs_mut().remove(tab_id, index)
     }
 
     #[inline(always)]
-    pub fn swap_split_in_direction(&mut self, direction: Direction) -> Option<()> {
-        self.tabs.swap_split_in_direction(self.tab, direction)
+    fn get_mut(&mut self, index: ViewId) -> &mut View {
+        self.tabs_mut().get_mut(index)
+    }
+
+    #[inline(always)]
+    fn resize(&mut self, area: Rect) -> bool {
+        let tab_id = self.tab_id();
+        self.tabs_mut().resize_tab(tab_id, area)
+    }
+
+    #[inline(always)]
+    fn recalculate(&mut self) {
+        let tab_id = self.tab_id();
+        self.tabs_mut().recalculate_tab(tab_id)
+    }
+
+    #[inline(always)]
+    fn transpose(&mut self) {
+        let tab_id = self.tab_id();
+        self.tabs_mut().transpose(tab_id)
+    }
+
+    #[inline(always)]
+    fn swap_split_in_direction(&mut self, direction: Direction) -> Option<()> {
+        let tab_id = self.tab_id();
+        self.tabs_mut().swap_split_in_direction(tab_id, direction)
+    }
+}
+
+// impl<'a> TabProxy<'a> {
+//     pub fn new(tabs: &'a mut Tabs, tab: TabId) -> Self {
+//         Self { tabs, tab }
+//     }
+
+//     #[inline(always)]
+//     fn tree(&self) -> &Tree {
+//         self.tabs.get_tree(self.tab)
+//     }
+
+//     #[inline(always)]
+//     fn tree_mut(&mut self) -> &mut Tree {
+//         self.tabs.get_tree_mut(self.tab)
+//     }
+
+//     #[inline(always)]
+//     pub fn focused(&self) -> ViewId {
+//         self.tree().focus
+//     }
+
+//     #[inline(always)]
+//     pub fn set_focused(&mut self, index: ViewId) {
+//         self.tree_mut().focus = index;
+//     }
+
+//     #[inline(always)]
+//     pub fn insert(&mut self, view: View) -> ViewId {
+//         self.tabs.insert(self.tab, view)
+//     }
+
+//     #[inline(always)]
+//     pub fn split(&mut self, view: View, layout: Layout) -> ViewId {
+//         self.tabs.split(self.tab, view, layout)
+//     }
+
+//     #[inline(always)]
+//     pub fn remove(&mut self, index: ViewId) {
+//         self.tabs.remove(self.tab, index)
+//     }
+
+//     #[inline(always)]
+//     pub fn views(&self) -> impl Iterator<Item = (&View, bool)> {
+//         self.tabs.tab_views(self.tab)
+//     }
+
+//     #[inline(always)]
+//     pub fn views_mut(&mut self) -> impl Iterator<Item = (&mut View, bool)> {
+//         self.tabs.tab_views_mut(self.tab)
+//     }
+
+//     #[inline(always)]
+//     pub fn get_focused(&self) -> &View {
+//         self.get(self.focused())
+//     }
+
+//     #[inline(always)]
+//     pub fn get(&self, index: ViewId) -> &View {
+//         self.try_get(index).unwrap()
+//     }
+
+//     #[inline(always)]
+//     pub fn try_get(&self, index: ViewId) -> Option<&View> {
+//         self.tabs.try_get(index)
+//     }
+
+//     #[inline(always)]
+//     pub fn get_mut(&mut self, index: ViewId) -> &mut View {
+//         self.tabs.get_mut(index)
+//     }
+
+//     #[inline(always)]
+//     pub fn contains(&self, index: ViewId) -> bool {
+//         self.tabs.tab_contains(self.tab, index).unwrap()
+//     }
+
+//     #[inline(always)]
+//     pub fn is_empty(&self) -> bool {
+//         self.tabs.tab_is_empty(self.tab)
+//     }
+
+//     #[inline(always)]
+//     pub fn resize(&mut self, area: Rect) -> bool {
+//         self.tabs.resize_tab(self.tab, area)
+//     }
+
+//     #[inline(always)]
+//     pub fn recalculate(&mut self) {
+//         self.tabs.recalculate_tab(self.tab)
+//     }
+
+//     #[inline(always)]
+//     pub fn find_split_in_direction(&self, id: ViewId, direction: Direction) -> Option<ViewId> {
+//         self.tabs.find_split_in_direction(self.tab, id, direction)
+//     }
+
+//     #[inline(always)]
+//     pub fn prev(&self) -> ViewId {
+//         self.tabs.prev(self.tab)
+//     }
+
+//     #[inline(always)]
+//     pub fn next(&self) -> ViewId {
+//         self.tabs.next(self.tab)
+//     }
+
+//     #[inline(always)]
+//     pub fn transpose(&mut self) {
+//         self.tabs.transpose(self.tab)
+//     }
+
+//     #[inline(always)]
+//     pub fn swap_split_in_direction(&mut self, direction: Direction) -> Option<()> {
+//         self.tabs.swap_split_in_direction(self.tab, direction)
+//     }
+// }
+
+impl<'a> Tab for TabProxy<'a> {
+    #[inline(always)]
+    fn tab_id(&self) -> TabId {
+        self.tab
+    }
+
+    #[inline(always)]
+    fn tabs(&self) -> &Tabs {
+        self.tabs
+    }
+}
+
+impl<'a> Tab for TabProxyMut<'a> {
+    #[inline(always)]
+    fn tab_id(&self) -> TabId {
+        self.tab
+    }
+
+    #[inline(always)]
+    fn tabs(&self) -> &Tabs {
+        self.tabs
+    }
+}
+
+impl<'a> TabMut for TabProxyMut<'a> {
+    #[inline(always)]
+    fn tabs_mut(&mut self) -> &mut Tabs {
+        self.tabs
+    }
+}
+
+impl<'a> TabProxy<'a> {
+    #[inline(always)]
+    pub fn views(&self) -> impl Iterator<Item = (&View, bool)> {
+        self.tabs().tab_views(self.tab_id())
+    }
+}
+
+impl<'a> TabProxyMut<'a> {
+    #[inline(always)]
+    pub fn views_mut(&mut self) -> impl Iterator<Item = (&mut View, bool)> {
+        let tab_id = self.tab_id();
+        self.tabs_mut().tab_views_mut(tab_id)
     }
 }
 
@@ -345,9 +514,17 @@ impl Tabs {
         self.set_focused_view(self.focus, index)
     }
 
-    pub fn curr(&mut self) -> TabDelegate {
+    pub fn curr(&self) -> TabProxy {
         let focus = self.focus;
-        TabDelegate {
+        TabProxy {
+            tabs: self,
+            tab: focus,
+        }
+    }
+
+    pub fn curr_mut(&mut self) -> TabProxyMut {
+        let focus = self.focus;
+        TabProxyMut {
             tabs: self,
             tab: focus,
         }
@@ -1086,7 +1263,7 @@ mod test {
             width: 180,
             height: 80,
         });
-        let mut tree = tabs.curr();
+        let mut tree = tabs.curr_mut();
         // let focus = tabs.focus;
         // let mut tree = TabDelegate::new(&mut tabs, focus);
         let mut view = View::new(DocumentId::default(), GutterConfig::default());
@@ -1147,7 +1324,7 @@ mod test {
         let doc_l0 = DocumentId::default();
         let mut view = View::new(doc_l0, GutterConfig::default());
         view.area = Rect::new(0, 0, 180, 80);
-        let mut tree = tabs.curr();
+        let mut tree = tabs.curr_mut();
         // let focus = tabs.focus;
         // let mut tree = TabDelegate::new(&mut tabs, focus);
         tree.insert(view);
@@ -1186,7 +1363,7 @@ mod test {
         // | l0  | l2 |    |
         // |    l1    | r0 |
 
-        fn doc_id<'a>(tree: &TabDelegate<'a>, view_id: ViewId) -> Option<DocumentId> {
+        fn doc_id<'a>(tree: &TabProxyMut<'a>, view_id: ViewId) -> Option<DocumentId> {
             if let Content::View(view) = &tree.tabs.nodes[view_id].content {
                 Some(view.doc)
             } else {
