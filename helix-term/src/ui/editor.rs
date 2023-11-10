@@ -1052,7 +1052,7 @@ impl EditorView {
         } = *event;
 
         let pos_and_view = |editor: &Editor, row, column, ignore_virtual_text| {
-            editor.tree.views().find_map(|(view, _focus)| {
+            editor.tabs.views().find_map(|(view, _focus)| {
                 view.pos_at_screen_coords(
                     &editor.documents[&view.doc],
                     row,
@@ -1064,7 +1064,7 @@ impl EditorView {
         };
 
         let gutter_coords_and_view = |editor: &Editor, row, column| {
-            editor.tree.views().find_map(|(view, _focus)| {
+            editor.tabs.views().find_map(|(view, _focus)| {
                 view.gutter_coords_at_screen_coords(row, column)
                     .map(|coords| (coords, view.id))
             })
@@ -1135,7 +1135,7 @@ impl EditorView {
             }
 
             MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {
-                let current_view = cxt.editor.tree.focus;
+                let current_view = cxt.editor.tabs.focused_view();
 
                 let direction = match event.kind {
                     MouseEventKind::ScrollUp => Direction::Backward,
@@ -1144,14 +1144,17 @@ impl EditorView {
                 };
 
                 match pos_and_view(cxt.editor, row, column, false) {
-                    Some((_, view_id)) => cxt.editor.tree.focus = view_id,
+                    Some((_, view_id)) => cxt.editor.tabs.set_focused_view_for_current_tab(view_id),
                     None => return EventResult::Ignored(None),
                 }
 
                 let offset = config.scroll_lines.unsigned_abs();
                 commands::scroll(cxt, offset, direction);
 
-                cxt.editor.tree.focus = current_view;
+                cxt.editor
+                    .tabs
+                    .set_focused_view_for_current_tab(current_view);
+                // cxt.editor.tabs.focus = current_view;
                 cxt.editor.ensure_cursor_in_view(current_view);
 
                 EventResult::Consumed(None)
@@ -1394,7 +1397,9 @@ impl Component for EditorView {
                 }
 
                 // if the focused view still exists and wasn't closed
-                if cx.editor.tree.contains(focus) {
+                // TODO(theofabilous): exists or contains?
+                // if cx.editor.tabs.contains(focus) {
+                if cx.editor.tabs.exists(focus) {
                     let config = cx.editor.config();
                     let mode = cx.editor.mode();
                     let view = view_mut!(cx.editor, focus);
@@ -1456,7 +1461,7 @@ impl Component for EditorView {
             Self::render_bufferline(cx.editor, area.with_height(1), surface);
         }
 
-        for (view, is_focused) in cx.editor.tree.views() {
+        for (view, is_focused) in cx.editor.tabs.views() {
             let doc = cx.editor.document(view.doc).unwrap();
             self.render_view(cx.editor, doc, view, area, surface, is_focused);
         }

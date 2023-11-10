@@ -612,7 +612,7 @@ impl PartialEq for MappableCommand {
 
 fn vim_operator(cx: &mut Context, f: fn(cx: &mut Context)) {
     let editor = &cx.editor;
-    let focused_view = editor.tree.get(editor.tree.focus);
+    let focused_view = editor.tabs.get(editor.tabs.focused_view());
     let doc = &editor.documents[&focused_view.doc];
     let primary_selection = doc.selection(focused_view.id).primary();
 
@@ -2858,7 +2858,7 @@ fn jumplist_picker(cx: &mut Context) {
         }
     }
 
-    for (view, _) in cx.editor.tree.views_mut() {
+    for (view, _) in cx.editor.tabs.views_mut() {
         for doc_id in view.jumps.iter().map(|e| e.0).collect::<Vec<_>>().iter() {
             let doc = doc_mut!(cx.editor, doc_id);
             view.sync_changes(doc);
@@ -2886,7 +2886,7 @@ fn jumplist_picker(cx: &mut Context) {
 
     let picker = Picker::new(
         cx.editor
-            .tree
+            .tabs
             .views()
             .flat_map(|(view, _)| {
                 view.jumps
@@ -2976,7 +2976,10 @@ pub fn command_palette(cx: &mut Context) {
 
                 command.execute(&mut ctx);
 
-                if ctx.editor.tree.contains(focus) {
+                // TODO(theofabilous): do we need to check if its in view
+                // or if it exists at all?
+                // XXX: if ctx.editor.tabs.contains(focus) {
+                if ctx.editor.tabs.exists(focus) {
                     let config = ctx.editor.config();
                     let mode = ctx.editor.mode();
                     let view = view_mut!(ctx.editor, focus);
@@ -3103,7 +3106,7 @@ async fn make_format_callback(
     let format = format.await;
 
     let call: job::Callback = Callback::Editor(Box::new(move |editor| {
-        if !editor.documents.contains_key(&doc_id) || !editor.tree.contains(view_id) {
+        if !editor.documents.contains_key(&doc_id) || !editor.tabs.curr().contains(view_id) {
             return;
         }
 
@@ -5000,7 +5003,7 @@ fn vsplit_new(cx: &mut Context) {
 }
 
 fn wclose(cx: &mut Context) {
-    if cx.editor.tree.views().count() == 1 {
+    if cx.editor.tabs.views().count() == 1 {
         if let Err(err) = typed::buffers_remaining_impl(cx.editor) {
             cx.editor.set_error(err.to_string());
             return;
@@ -5014,7 +5017,7 @@ fn wclose(cx: &mut Context) {
 fn wonly(cx: &mut Context) {
     let views = cx
         .editor
-        .tree
+        .tabs
         .views()
         .map(|(v, focus)| (v.id, focus))
         .collect::<Vec<_>>();

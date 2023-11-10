@@ -41,6 +41,7 @@ impl std::fmt::Display for DocumentId {
 
 slotmap::new_key_type! {
     pub struct ViewId;
+    pub struct TabId;
 }
 
 pub enum Align {
