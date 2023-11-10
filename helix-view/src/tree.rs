@@ -1,5 +1,5 @@
 use crate::{graphics::Rect, TabId, View, ViewId};
-use slotmap::{HopSlotMap, SparseSecondaryMap};
+use slotmap::{sparse_secondary::Keys, HopSlotMap, SparseSecondaryMap};
 
 #[derive(Debug)]
 pub struct Tabs {
@@ -257,6 +257,38 @@ impl Tabs {
         }
         // self.tab_views_mut(tab).
     }
+
+    pub fn iter_view_ids<'a>(&'a self, tab: TabId) -> impl Iterator<Item = ViewId> + 'a {
+        self.get_tree(tab)
+            .nodes
+            .keys()
+            .filter(|id| match self.nodes.get(*id) {
+                Some(Node {
+                    content: Content::View(_),
+                    ..
+                }) => true,
+                _ => false,
+            })
+    }
+
+    pub fn view_ids(&self, tab: TabId) -> Vec<ViewId> {
+        self.iter_view_ids(tab).collect()
+    }
+
+    // pub fn close_tab_get_views(&mut self, tab: TabId) -> Option<Tree> {
+    //     if self.len() == 1 {
+    //         return None;
+    //     }
+    //     let tab = self.trees.remove(tab).unwrap();
+    //     for index in tab.nodes.keys() {
+    //         self.nodes.remove(index);
+    //     }
+    //     if self.focus == tab.id {
+    //         self.focus_previous();
+    //     }
+
+    //     Some(tab)
+    // }
 
     pub fn focus_next(&mut self) -> TabId {
         let curr = self.focus;

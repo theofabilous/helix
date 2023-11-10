@@ -39,7 +39,7 @@ use helix_view::{
     keyboard::KeyCode,
     tree,
     view::View,
-    Document, DocumentId, Editor, ViewId,
+    Document, DocumentId, Editor, TabId, ViewId,
 };
 
 use anyhow::{anyhow, bail, ensure, Context as _};
@@ -332,6 +332,7 @@ impl MappableCommand {
         file_picker_in_current_directory, "Open file picker at current working directory",
         code_action, "Perform code action",
         buffer_picker, "Open buffer picker",
+        tab_picker, "Open tab picker",
         jumplist_picker, "Open jumplist picker",
         symbol_picker, "Open symbol picker",
         select_references_to_symbol_under_cursor, "Select symbol references",
@@ -2807,6 +2808,8 @@ fn buffer_picker(cx: &mut Context) {
     // mru
     items.sort_unstable_by_key(|item| std::cmp::Reverse(item.focused_at));
 
+    // TODO(theofabilous): if the buffer was in another tab which was closed, the preview is
+    // empty. should this be handled?
     let picker = Picker::new(items, (), |cx, meta, action| {
         cx.editor.switch(meta.id, action);
     })
@@ -2819,6 +2822,57 @@ fn buffer_picker(cx: &mut Context) {
             .cursor_line(doc.text().slice(..));
         Some((meta.id.into(), Some((line, line))))
     });
+    cx.push_layer(Box::new(overlaid(picker)));
+}
+
+fn tab_picker(cx: &mut Context) {
+    let current = cx.editor.tabs.focus;
+
+    #[derive(Debug)]
+    struct TabMeta {
+        idx: usize,
+        id: TabId,
+        name: String,
+        view_count: usize,
+        is_current: bool,
+    }
+
+    impl ui::menu::Item for TabMeta {
+        type Data = ();
+
+        fn format(&self, _data: &Self::Data) -> Row {
+            let mut flags = String::new();
+            if self.is_current {
+                flags.push('*');
+            }
+
+            Row::new([
+                (self.idx + 1).to_string(),
+                self.name.clone(),
+                flags,
+                format!("  ({})", self.view_count),
+            ])
+        }
+    }
+
+    let opts = cx
+        .editor
+        .tabs
+        .iter_tabs()
+        .enumerate()
+        .map(|(idx, (id, _))| TabMeta {
+            idx,
+            id,
+            name: format!("Tab {}", idx),
+            view_count: cx.editor.tabs.iter_view_ids(id).count(),
+            is_current: id == current,
+        })
+        .collect();
+
+    let picker = Picker::new(opts, (), |cx, meta, _action| {
+        cx.editor.tabs.focus = meta.id;
+    });
+
     cx.push_layer(Box::new(overlaid(picker)));
 }
 
