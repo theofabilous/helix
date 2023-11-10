@@ -1663,19 +1663,6 @@ fn tab_close(
         }
     }
     _ = cx.editor.tabs.close_tab(focus);
-    // for id in view_ids {
-    //     for doc in cx.editor.documents_mut() {
-    //         doc.remove_view(id);
-    //     }
-    // }
-    // for id in cx.editor.tabs.iter_view_ids(focus).cloned() {
-    // for (id, _) in cx.editor.tabs.traverse(focus) {
-    //     for doc in cx.editor.documents_mut() {
-    //         doc.remove_view(id);
-    //     }
-    // }
-    // _ = cx.editor.tabs.new_tab();
-    // cx.editor.new_file(Action::VerticalSplit);
 
     Ok(())
 }

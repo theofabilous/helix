@@ -1,5 +1,5 @@
 use crate::{graphics::Rect, TabId, View, ViewId};
-use slotmap::{sparse_secondary::Keys, HopSlotMap, SparseSecondaryMap};
+use slotmap::{HopSlotMap, SparseSecondaryMap};
 
 #[derive(Debug)]
 pub struct Tabs {
@@ -255,7 +255,6 @@ impl Tabs {
         } else {
             Some(self.focus_previous())
         }
-        // self.tab_views_mut(tab).
     }
 
     pub fn iter_view_ids<'a>(&'a self, tab: TabId) -> impl Iterator<Item = ViewId> + 'a {
@@ -274,21 +273,6 @@ impl Tabs {
     pub fn view_ids(&self, tab: TabId) -> Vec<ViewId> {
         self.iter_view_ids(tab).collect()
     }
-
-    // pub fn close_tab_get_views(&mut self, tab: TabId) -> Option<Tree> {
-    //     if self.len() == 1 {
-    //         return None;
-    //     }
-    //     let tab = self.trees.remove(tab).unwrap();
-    //     for index in tab.nodes.keys() {
-    //         self.nodes.remove(index);
-    //     }
-    //     if self.focus == tab.id {
-    //         self.focus_previous();
-    //     }
-
-    //     Some(tab)
-    // }
 
     pub fn focus_next(&mut self) -> TabId {
         let curr = self.focus;
@@ -310,25 +294,6 @@ impl Tabs {
     pub fn iter_tabs(&self) -> impl Iterator<Item = (TabId, &Tree)> {
         self.trees.iter()
     }
-
-    // pub fn new(area: Rect) -> Self {
-    //     let root = Node::container(Layout::Vertical);
-
-    //     let mut nodes = HopSlotMap::with_key();
-    //     let root = nodes.insert(root);
-
-    //     // root is it's own parent
-    //     nodes[root].parent = root;
-
-    //     Self {
-    //         root,
-    //         focus: root,
-    //         // fullscreen: false,
-    //         area,
-    //         nodes,
-    //         stack: Vec::new(),
-    //     }
-    // }
 
     pub fn new(area: Rect) -> Self {
         let nodes = HopSlotMap::with_key();
@@ -396,44 +361,6 @@ impl Tabs {
         self.trees.is_empty()
     }
 
-    // pub fn insert(&mut self, view: View) -> ViewId {
-    //     let focus = self.focus;
-    //     let parent = self.nodes[focus].parent;
-    //     let mut node = Node::view(view);
-    //     node.parent = parent;
-    //     let node = self.nodes.insert(node);
-    //     self.get_mut(node).id = node;
-
-    //     let container = match &mut self.nodes[parent] {
-    //         Node {
-    //             content: Content::Container(container),
-    //             ..
-    //         } => container,
-    //         _ => unreachable!(),
-    //     };
-
-    //     // insert node after the current item if there is children already
-    //     let pos = if container.children.is_empty() {
-    //         0
-    //     } else {
-    //         let pos = container
-    //             .children
-    //             .iter()
-    //             .position(|&child| child == focus)
-    //             .unwrap();
-    //         pos + 1
-    //     };
-
-    //     container.children.insert(pos, node);
-    //     // focus the new node
-    //     self.focus = node;
-
-    //     // recalculate all the sizes
-    //     self.recalculate();
-
-    //     node
-    // }
-
     pub fn insert(&mut self, tab: TabId, view: View) -> ViewId {
         let focus = self.get_tree_mut(tab).focus;
         let parent = self.nodes[focus].parent;
@@ -473,79 +400,6 @@ impl Tabs {
 
         node
     }
-
-    // pub fn split(&mut self, view: View, layout: Layout) -> ViewId {
-    //     let focus = self.focus;
-    //     let parent = self.nodes[focus].parent;
-
-    //     let node = Node::view(view);
-    //     let node = self.nodes.insert(node);
-    //     self.get_mut(node).id = node;
-
-    //     let container = match &mut self.nodes[parent] {
-    //         Node {
-    //             content: Content::Container(container),
-    //             ..
-    //         } => container,
-    //         _ => unreachable!(),
-    //     };
-    //     if container.layout == layout {
-    //         // insert node after the current item if there is children already
-    //         let pos = if container.children.is_empty() {
-    //             0
-    //         } else {
-    //             let pos = container
-    //                 .children
-    //                 .iter()
-    //                 .position(|&child| child == focus)
-    //                 .unwrap();
-    //             pos + 1
-    //         };
-    //         container.children.insert(pos, node);
-    //         self.nodes[node].parent = parent;
-    //     } else {
-    //         let mut split = Node::container(layout);
-    //         split.parent = parent;
-    //         let split = self.nodes.insert(split);
-
-    //         let container = match &mut self.nodes[split] {
-    //             Node {
-    //                 content: Content::Container(container),
-    //                 ..
-    //             } => container,
-    //             _ => unreachable!(),
-    //         };
-    //         container.children.push(focus);
-    //         container.children.push(node);
-    //         self.nodes[focus].parent = split;
-    //         self.nodes[node].parent = split;
-
-    //         let container = match &mut self.nodes[parent] {
-    //             Node {
-    //                 content: Content::Container(container),
-    //                 ..
-    //             } => container,
-    //             _ => unreachable!(),
-    //         };
-
-    //         let pos = container
-    //             .children
-    //             .iter()
-    //             .position(|&child| child == focus)
-    //             .unwrap();
-
-    //         // replace focus on parent with split
-    //         container.children[pos] = split;
-    //     }
-
-    //     // focus the new node
-    //     self.focus = node;
-
-    //     // recalculate all the sizes
-    //     self.recalculate();
-
-    //     node
-    // }
 
     pub fn split(&mut self, tab: TabId, view: View, layout: Layout) -> ViewId {
         let focus = self.get_tree_mut(tab).focus;
@@ -621,38 +475,6 @@ impl Tabs {
 
         node
     }
-
-    // pub fn remove(&mut self, index: ViewId) {
-    //     let mut stack = Vec::new();
-
-    //     if self.focus == index {
-    //         // focus on something else
-    //         self.focus = self.prev();
-    //     }
-
-    //     stack.push(index);
-
-    //     while let Some(index) = stack.pop() {
-    //         let parent_id = self.nodes[index].parent;
-    //         if let Node {
-    //             content: Content::Container(container),
-    //             ..
-    //         } = &mut self.nodes[parent_id]
-    //         {
-    //             if let Some(pos) = container.children.iter().position(|&child| child == index) {
-    //                 container.children.remove(pos);
-    //                 // TODO: if container now only has one child, remove it and place child in parent
-    //                 if container.children.is_empty() && parent_id != self.root {
-    //                     // if container now empty, remove it
-    //                     stack.push(parent_id);
-    //                 }
-    //             }
-    //         }
-    //         self.nodes.remove(index);
-    //     }
-
-    //     self.recalculate()
-    // }
 
     pub fn remove(&mut self, tab: TabId, index: ViewId) {
         let mut stack = Vec::new();
@@ -805,16 +627,6 @@ impl Tabs {
             .and_then(move |tab| Some(tab.nodes.contains_key(index)))
     }
 
-    // pub fn is_empty(&self) -> bool {
-    //     match &self.nodes[self.root] {
-    //         Node {
-    //             content: Content::Container(container),
-    //             ..
-    //         } => container.children.is_empty(),
-    //         _ => unreachable!(),
-    //     }
-    // }
-
     pub fn tab_is_empty(&self, tab: TabId) -> bool {
         let tab = self.get_tree(tab);
         match &self.nodes[tab.root] {
@@ -832,7 +644,6 @@ impl Tabs {
 
     // TODO(theofabilous): what is area?
     // can it change from tree to tree?
-
     pub fn resize_tab(&mut self, tab: TabId, area: Rect) -> bool {
         let mut tree = self.get_tree_mut(tab);
         if tree.area != area {
@@ -845,7 +656,7 @@ impl Tabs {
 
     // I think this is fine as long as the keys in Tabs are not touched
     // otherwise we have to collect into a vec..
-    pub unsafe fn for_each_key_mut(&mut self, mut f: impl FnMut(&mut Self, TabId)) {
+    pub unsafe fn for_each_tab_id_mut(&mut self, mut f: impl FnMut(&mut Self, TabId)) {
         for key in (*(self as *mut Self)).trees.keys() {
             f(self, key);
         }
@@ -854,28 +665,18 @@ impl Tabs {
     pub fn resize(&mut self, area: Rect) -> bool {
         let mut result = false;
         unsafe {
-            self.for_each_key_mut(|this, key| {
+            self.for_each_tab_id_mut(|this, key| {
                 result |= this.resize_tab(key, area);
             });
         }
         result
-        // let keys = self.trees.keys().cloned();
-        // for key in keys.into() {
-        //     self.resize_tab(key, area);
-        // }
-        // true
-        // self.trees
-        //     .keys()
-        //     .into_iter()
-        //     .map(|tab| self.resize_tab(tab, area))
-        //     .any(|x| x)
     }
 
     // TODO(theofabilous): maybe this could be done lazily
     // i.e. only do it for the active tab, and recalc when
     // switching to a tab for which a recalc is needed
     pub fn recalculate(&mut self) {
-        unsafe { self.for_each_key_mut(|this, tab| this.recalculate_tab(tab)) }
+        unsafe { self.for_each_tab_id_mut(|this, tab| this.recalculate_tab(tab)) }
     }
 
     pub fn recalculate_tab(&mut self, tab: TabId) {
