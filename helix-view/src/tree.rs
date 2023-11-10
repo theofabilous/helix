@@ -137,7 +137,7 @@ pub trait Tab {
 
     #[inline(always)]
     fn is_empty(&self) -> bool {
-        self.tabs().tab_is_empty(self.tab_id())
+        self.tabs().tab_is_empty(self.tab_id()).unwrap()
     }
 
     #[inline(always)]
@@ -689,9 +689,6 @@ impl Tabs {
     pub fn exists(&self, index: ViewId) -> bool {
         self.nodes.contains_key(index)
     }
-    // pub fn contains(&self, index: ViewId) -> bool {
-    //     self.nodes.contains_key(index)
-    // }
 
     /// Check if tree contains a [Node] with a given index. Returns None if
     /// the tap does not exist.
@@ -700,19 +697,24 @@ impl Tabs {
             .and_then(move |tab| Some(tab.nodes.contains_key(index)))
     }
 
-    pub fn tab_is_empty(&self, tab: TabId) -> bool {
+    pub fn tab_is_empty(&self, tab: TabId) -> Option<bool> {
         let tab = self.get_tree(tab);
-        match &self.nodes[tab.root] {
+        // TODO(theofabilous): this was giving 'invalid HopSlotMap' panic
+        // when used without '.get()' when doing ":quit-all". Ensure that
+        // it is normal.
+        match &self.nodes.get(tab.root)? {
             Node {
                 content: Content::Container(container),
                 ..
-            } => container.children.is_empty(),
+            } => Some(container.children.is_empty()),
             _ => unreachable!(),
         }
     }
 
     pub fn all_empty(&self) -> bool {
-        self.trees.keys().all(|tab| self.tab_is_empty(tab))
+        self.trees
+            .keys()
+            .all(|tab| self.tab_is_empty(tab).unwrap_or(true))
     }
 
     // TODO(theofabilous): what is area?
@@ -753,10 +755,14 @@ impl Tabs {
     }
 
     pub fn recalculate_tab(&mut self, tab: TabId) {
-        if self.tab_is_empty(tab) {
-            let mut tree = self.get_tree_mut(tab);
-            tree.focus = tree.root;
-            return;
+        match self.tab_is_empty(tab) {
+            None => return,
+            Some(true) => {
+                let mut tree = self.get_tree_mut(tab);
+                tree.focus = tree.root;
+                return;
+            }
+            _ => (),
         }
 
         let tree = self.get_tree(tab);
