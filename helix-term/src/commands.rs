@@ -2858,7 +2858,7 @@ fn jumplist_picker(cx: &mut Context) {
         }
     }
 
-    for (view, _) in cx.editor.tabs.views_mut() {
+    for (view, _) in cx.editor.tabs.all_views_mut() {
         for doc_id in view.jumps.iter().map(|e| e.0).collect::<Vec<_>>().iter() {
             let doc = doc_mut!(cx.editor, doc_id);
             view.sync_changes(doc);
@@ -2887,7 +2887,7 @@ fn jumplist_picker(cx: &mut Context) {
     let picker = Picker::new(
         cx.editor
             .tabs
-            .views()
+            .all_views()
             .flat_map(|(view, _)| {
                 view.jumps
                     .iter()
@@ -5003,7 +5003,7 @@ fn vsplit_new(cx: &mut Context) {
 }
 
 fn wclose(cx: &mut Context) {
-    if cx.editor.tabs.views().count() == 1 {
+    if cx.editor.tabs.curr().views().count() == 1 {
         if let Err(err) = typed::buffers_remaining_impl(cx.editor) {
             cx.editor.set_error(err.to_string());
             return;
@@ -5018,6 +5018,7 @@ fn wonly(cx: &mut Context) {
     let views = cx
         .editor
         .tabs
+        .curr()
         .views()
         .map(|(v, focus)| (v.id, focus))
         .collect::<Vec<_>>();

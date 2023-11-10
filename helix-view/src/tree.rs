@@ -214,7 +214,7 @@ impl<'a> TabDelegate<'a> {
 }
 
 impl Tabs {
-    pub fn new_tree(&mut self, area: Rect) -> TabId {
+    fn new_tree(&mut self, area: Rect) -> TabId {
         let root = Node::container(Layout::Vertical);
         let root = self.nodes.insert(root);
         self.nodes[root].parent = root;
@@ -233,6 +233,22 @@ impl Tabs {
         let tab_id = self.trees.insert(tree);
         self.trees.get_mut(tab_id).unwrap().id = tab_id;
         tab_id
+    }
+
+    pub fn new_tab(&mut self) -> TabId {
+        let area = self.area(self.focus);
+        let tab_id = self.new_tree(area);
+        self.focus = tab_id;
+        tab_id
+    }
+
+    pub fn focus_next(&mut self) -> TabId {
+        let curr = self.focus;
+        let mut iter = self.trees.keys().skip_while(|tab| *tab != curr);
+        iter.next();
+        let id = iter.next().or_else(|| self.trees.keys().next()).unwrap();
+        self.focus = id;
+        id
     }
 
     // pub fn new(area: Rect) -> Self {
@@ -604,6 +620,7 @@ impl Tabs {
                     }
                 }
             }
+            self.get_tree_mut(tab).nodes.remove(index);
             self.nodes.remove(index);
         }
 
@@ -643,7 +660,7 @@ impl Tabs {
         })
     }
 
-    pub fn views(&self) -> impl Iterator<Item = (&View, bool)> {
+    pub fn all_views(&self) -> impl Iterator<Item = (&View, bool)> {
         let focus = self.trees.get(self.focus).unwrap().focus;
         self.nodes.iter().filter_map(move |(key, node)| match node {
             Node {
@@ -654,7 +671,7 @@ impl Tabs {
         })
     }
 
-    pub fn views_mut(&mut self) -> impl Iterator<Item = (&mut View, bool)> {
+    pub fn all_views_mut(&mut self) -> impl Iterator<Item = (&mut View, bool)> {
         let focus = self.trees.get(self.focus).unwrap().focus;
         self.nodes
             .iter_mut()
