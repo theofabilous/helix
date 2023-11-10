@@ -6,9 +6,9 @@ use crate::{
     input::KeyEvent,
     register::Registers,
     theme::{self, Theme},
-    tree::{self, Tree},
+    tree::{self, Tabs, Tree},
     view::ViewPosition,
-    Align, Document, DocumentId, View, ViewId,
+    Align, Document, DocumentId, TabId, View, ViewId,
 };
 use dap::StackFrame;
 use helix_vcs::DiffProviderRegistry;
@@ -877,7 +877,8 @@ use futures_util::stream::{Flatten, Once};
 pub struct Editor {
     /// Current editing mode.
     pub mode: Mode,
-    pub tree: Tree,
+    // pub tree: Tree,
+    pub tabs: Tabs,
     pub next_document_id: DocumentId,
     pub documents: BTreeMap<DocumentId, Document>,
 
@@ -1027,7 +1028,8 @@ impl Editor {
 
         Self {
             mode: Mode::Normal,
-            tree: Tree::new(area),
+            // tabs: Tree::new(area),
+            tabs: Tabs::new(area),
             next_document_id: DocumentId::default(),
             documents: BTreeMap::new(),
             saves: HashMap::new(),
@@ -1279,7 +1281,7 @@ impl Editor {
             }
         }
 
-        for (view, _) in self.tree.views_mut() {
+        for (view, _) in self.tabs.views_mut() {
             let doc = doc_mut!(self, &view.doc);
             view.sync_changes(doc);
             view.gutters = config.gutters.clone();
@@ -1288,7 +1290,7 @@ impl Editor {
     }
 
     fn replace_document_in_view(&mut self, current_view: ViewId, doc_id: DocumentId) {
-        let view = self.tree.get_mut(current_view);
+        let view = self.tabs.get_mut(current_view);
         view.doc = doc_id;
         view.offset = ViewPosition::default();
 
@@ -1323,8 +1325,8 @@ impl Editor {
                     && id != doc.id
                     // Ensure the buffer is not displayed in any other splits.
                     && !self
-                        .tree
-                        .traverse()
+                        .tabs
+                        .traverse(self.tabs.focus)
                         .any(|(_, v)| v.doc == doc.id && v.id != view.id);
 
                 let (view, doc) = current!(self);
@@ -1340,7 +1342,7 @@ impl Editor {
                     self.documents.remove(&id);
 
                     // Remove the scratch buffer from any jumplists
-                    for (view, _) in self.tree.views_mut() {
+                    for (view, _) in self.tabs.views_mut() {
                         view.remove_document(&id);
                     }
                 } else {
@@ -1372,12 +1374,13 @@ impl Editor {
             Action::HorizontalSplit | Action::VerticalSplit => {
                 // copy the current view, unless there is no view yet
                 let view = self
-                    .tree
-                    .try_get(self.tree.focus)
+                    .tabs
+                    .try_get(self.tabs.focused_view())
                     .filter(|v| id == v.doc) // Different Document
                     .cloned()
                     .unwrap_or_else(|| View::new(id, self.config().gutters.clone()));
-                let view_id = self.tree.split(
+                let view_id = self.tabs.split(
+                    self.tabs.focus,
                     view,
                     match action {
                         Action::HorizontalSplit => Layout::Horizontal,
@@ -1477,7 +1480,7 @@ impl Editor {
         for doc in self.documents_mut() {
             doc.remove_view(id);
         }
-        self.tree.remove(id);
+        self.tabs.remove(self.tabs.focus, id);
         self._refresh();
     }
 
@@ -1504,7 +1507,7 @@ impl Editor {
         }
 
         let actions: Vec<Action> = self
-            .tree
+            .tabs
             .views_mut()
             .filter_map(|(view, _focus)| {
                 view.remove_document(&doc_id);
@@ -1539,7 +1542,7 @@ impl Editor {
         // If the document we removed was visible in all views, we will have no more views. We don't
         // want to close the editor just for a simple buffer close, so we need to create a new view
         // containing either an existing document, or a brand new document.
-        if self.tree.views().next().is_none() {
+        if self.tabs.views().next().is_none() {
             let doc_id = self
                 .documents
                 .iter()
@@ -1547,7 +1550,7 @@ impl Editor {
                 .next()
                 .unwrap_or_else(|| self.new_document(Document::default(self.config.clone())));
             let view = View::new(doc_id, self.config().gutters.clone());
-            let view_id = self.tree.insert(view);
+            let view_id = self.tabs.insert(self.tabs.focus, view);
             let doc = doc_mut!(self, &doc_id);
             doc.ensure_view_init(view_id);
             doc.mark_as_focused();
@@ -1596,13 +1599,14 @@ impl Editor {
     }
 
     pub fn resize(&mut self, area: Rect) {
-        if self.tree.resize(area) {
+        if self.tabs.resize(area) {
             self._refresh();
         };
     }
 
     pub fn focus(&mut self, view_id: ViewId) {
-        let prev_id = std::mem::replace(&mut self.tree.focus, view_id);
+        let mut tree = self.tabs.get_tree_mut(self.tabs.focus);
+        let prev_id = std::mem::replace(&mut tree.focus, view_id);
 
         // if leaving the view: mode should reset and the cursor should be
         // within view
@@ -1611,7 +1615,7 @@ impl Editor {
             self.ensure_cursor_in_view(view_id);
 
             // Update jumplist selections with new document changes.
-            for (view, _focused) in self.tree.views_mut() {
+            for (view, _focused) in self.tabs.curr().views_mut() {
                 let doc = doc_mut!(self, &view.doc);
                 view.sync_changes(doc);
             }
@@ -1623,35 +1627,39 @@ impl Editor {
     }
 
     pub fn focus_next(&mut self) {
-        self.focus(self.tree.next());
+        self.focus(self.tabs.next(self.tabs.focus));
     }
 
     pub fn focus_prev(&mut self) {
-        self.focus(self.tree.prev());
+        self.focus(self.tabs.prev(self.tabs.focus));
     }
 
     pub fn focus_direction(&mut self, direction: tree::Direction) {
-        let current_view = self.tree.focus;
-        if let Some(id) = self.tree.find_split_in_direction(current_view, direction) {
+        let current_view = self.tabs.focused_view();
+        if let Some(id) =
+            self.tabs
+                .find_split_in_direction(self.tabs.focus, current_view, direction)
+        {
             self.focus(id)
         }
     }
 
     pub fn swap_split_in_direction(&mut self, direction: tree::Direction) {
-        self.tree.swap_split_in_direction(direction);
+        self.tabs
+            .swap_split_in_direction(self.tabs.focus, direction);
     }
 
     pub fn transpose_view(&mut self) {
-        self.tree.transpose();
+        self.tabs.transpose(self.tabs.focus);
     }
 
     pub fn should_close(&self) -> bool {
-        self.tree.is_empty()
+        self.tabs.tab_is_empty(self.tabs.focus)
     }
 
     pub fn ensure_cursor_in_view(&mut self, id: ViewId) {
         let config = self.config();
-        let view = self.tree.get_mut(id);
+        let view = self.tabs.get_mut(id);
         let doc = &self.documents[&view.doc];
         view.ensure_cursor_in_view(doc, config.scrolloff)
     }

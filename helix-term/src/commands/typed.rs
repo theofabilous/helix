@@ -75,7 +75,7 @@ fn quit(cx: &mut compositor::Context, args: &[Cow<str>], event: PromptEvent) -> 
     ensure!(args.is_empty(), ":quit takes no arguments");
 
     // last view and we have unsaved changes
-    if cx.editor.tree.views().count() == 1 {
+    if cx.editor.tabs.views().count() == 1 {
         buffers_remaining_impl(cx.editor)?
     }
 
@@ -800,7 +800,7 @@ fn quit_all_impl(cx: &mut compositor::Context, force: bool) -> anyhow::Result<()
     }
 
     // close all views
-    let views: Vec<_> = cx.editor.tree.views().map(|(view, _)| view.id).collect();
+    let views: Vec<_> = cx.editor.tabs.views().map(|(view, _)| view.id).collect();
     for view_id in views {
         cx.editor.close(view_id);
     }
