@@ -276,6 +276,8 @@ pub struct Config {
     pub rulers: Vec<u16>,
     #[serde(default)]
     pub whitespace: WhitespaceConfig,
+    /// Display open tabs at the top
+    pub tabline: TabLine,
     /// Persistently display open buffers along the top
     pub bufferline: BufferLine,
     /// Vertical indent width guides.
@@ -576,6 +578,17 @@ impl Default for CursorShapeConfig {
     }
 }
 
+/// tabline render modes
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TabLine {
+    /// Always render
+    Always,
+    /// Only if multiple buffers are open
+    #[default]
+    Multiple,
+}
+
 /// bufferline render modes
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -833,6 +846,7 @@ impl Default for Config {
             terminal: get_terminal_provider(),
             rulers: Vec::new(),
             whitespace: WhitespaceConfig::default(),
+            tabline: TabLine::default(),
             bufferline: BufferLine::default(),
             indent_guides: IndentGuidesConfig::default(),
             color_modes: false,
@@ -1326,8 +1340,14 @@ impl Editor {
                     // Ensure the buffer is not displayed in any other splits.
                     && !self
                         .tabs
-                        .traverse(self.tabs.focus)
-                        .any(|(_, v)| v.doc == doc.id && v.id != view.id);
+                        .iter_tabs()
+                        .map(|(tab, _)| {
+                            self.tabs.traverse(tab).any(|(_, v)| {
+                                v.doc == doc.id && v.id != view.id
+                            })
+                        }).any(|v| v);
+                // .traverse(self.tabs.focus)
+                // .any(|(_, v)| v.doc == doc.id && v.id != view.id);
 
                 let (view, doc) = current!(self);
                 let view_id = view.id;
@@ -1481,6 +1501,10 @@ impl Editor {
             doc.remove_view(id);
         }
         self.tabs.remove(self.tabs.focus, id);
+        if self.tabs.curr().is_empty() && self.tabs.len() > 1 {
+            self.tabs.close_tab(self.tabs.focus);
+            // self.focus_prev();
+        }
         self._refresh();
     }
 

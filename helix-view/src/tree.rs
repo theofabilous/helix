@@ -242,6 +242,22 @@ impl Tabs {
         tab_id
     }
 
+    pub fn close_tab(&mut self, tab: TabId) -> Option<TabId> {
+        if self.len() == 1 {
+            return None;
+        }
+        let tab = self.trees.remove(tab).unwrap();
+        for index in tab.nodes.keys() {
+            self.nodes.remove(index);
+        }
+        if self.focus != tab.id {
+            Some(self.focus)
+        } else {
+            Some(self.focus_previous())
+        }
+        // self.tab_views_mut(tab).
+    }
+
     pub fn focus_next(&mut self) -> TabId {
         let curr = self.focus;
         let mut iter = self.trees.keys().skip_while(|tab| *tab != curr);
@@ -249,6 +265,18 @@ impl Tabs {
         let id = iter.next().or_else(|| self.trees.keys().next()).unwrap();
         self.focus = id;
         id
+    }
+
+    pub fn focus_previous(&mut self) -> TabId {
+        let curr = self.focus;
+        let iter = self.trees.keys().take_while(|tab| *tab != curr);
+        let id = iter.last().or_else(|| self.trees.keys().last()).unwrap();
+        self.focus = id;
+        id
+    }
+
+    pub fn iter_tabs(&self) -> impl Iterator<Item = (TabId, &Tree)> {
+        self.trees.iter()
     }
 
     // pub fn new(area: Rect) -> Self {
@@ -326,6 +354,14 @@ impl Tabs {
             tabs: self,
             tab: focus,
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.trees.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.trees.is_empty()
     }
 
     // pub fn insert(&mut self, view: View) -> ViewId {

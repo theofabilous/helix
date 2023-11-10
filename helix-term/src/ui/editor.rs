@@ -519,6 +519,50 @@ impl EditorView {
         Vec::new()
     }
 
+    /// Render tabline at the top
+    pub fn render_tabline(editor: &Editor, viewport: Rect, surface: &mut Surface) {
+        surface.clear_with(
+            viewport,
+            editor
+                .theme
+                .try_get("ui.bufferline.background")
+                .unwrap_or_else(|| editor.theme.get("ui.statusline")),
+        );
+
+        let bufferline_active = editor
+            .theme
+            .try_get("ui.bufferline.active")
+            .unwrap_or_else(|| editor.theme.get("ui.statusline.active"));
+
+        let bufferline_inactive = editor
+            .theme
+            .try_get("ui.bufferline")
+            .unwrap_or_else(|| editor.theme.get("ui.statusline.inactive"));
+
+        let mut x = viewport.x;
+
+        let current_tab = editor.tabs.focus;
+        for (index, (id, _)) in editor.tabs.iter_tabs().enumerate() {
+            let style = if current_tab == id {
+                bufferline_active
+            } else {
+                bufferline_inactive
+            };
+
+            // let text = format!(" {} ", tab.name);
+            let text = format!(" Tab {} ", index);
+            let used_width = viewport.x.saturating_sub(x);
+            let rem_width = surface.area.width.saturating_sub(used_width);
+            x = surface
+                .set_stringn(x, viewport.y, text, rem_width as usize, style)
+                .0;
+
+            if x >= surface.area.right() {
+                break;
+            }
+        }
+    }
+
     /// Render bufferline at the top
     pub fn render_bufferline(editor: &Editor, viewport: Rect, surface: &mut Surface) {
         let scratch = PathBuf::from(SCRATCH_BUFFER_NAME); // default filename to use for scratch buffer
@@ -1412,6 +1456,14 @@ impl Component for EditorView {
         surface.set_style(area, cx.editor.theme.get("ui.background"));
         let config = cx.editor.config();
 
+        // check if tabline should be rendered
+        use helix_view::editor::TabLine;
+        let use_tabline = match config.tabline {
+            TabLine::Always => true,
+            TabLine::Multiple if cx.editor.tabs.len() > 1 => true,
+            _ => false,
+        };
+
         // check if bufferline should be rendered
         use helix_view::editor::BufferLine;
         let use_bufferline = match config.bufferline {
@@ -1420,8 +1472,15 @@ impl Component for EditorView {
             _ => false,
         };
 
-        // -1 for commandline and -1 for bufferline
+        // -1 for commandline and -1 for tabline
+        let mut bufferline_area = area;
         let mut editor_area = area.clip_bottom(1);
+        if use_tabline {
+            editor_area = editor_area.clip_top(1);
+            bufferline_area = bufferline_area.clip_top(1);
+        }
+
+        // -1 for bufferline
         if use_bufferline {
             editor_area = editor_area.clip_top(1);
         }
@@ -1429,8 +1488,12 @@ impl Component for EditorView {
         // if the terminal size suddenly changed, we need to trigger a resize
         cx.editor.resize(editor_area);
 
+        if use_tabline {
+            Self::render_tabline(cx.editor, area.with_height(1), surface);
+        }
+
         if use_bufferline {
-            Self::render_bufferline(cx.editor, area.with_height(1), surface);
+            Self::render_bufferline(cx.editor, bufferline_area.with_height(1), surface);
         }
 
         for (view, is_focused) in cx.editor.tabs.tab_views(cx.editor.tabs.focus) {
