@@ -217,14 +217,15 @@ impl Tabs {
     pub fn new_tree(&mut self, area: Rect) -> TabId {
         let root = Node::container(Layout::Vertical);
         let root = self.nodes.insert(root);
-        let tree_nodes = SparseSecondaryMap::new();
+        self.nodes[root].parent = root;
+        // let tree_nodes = SparseSecondaryMap::new();
 
         let mut tree = Tree {
             id: TabId::default(),
             root,
             focus: root,
             area,
-            nodes: tree_nodes,
+            nodes: SparseSecondaryMap::new(),
             stack: Vec::new(),
         };
         tree.nodes.insert(root, ());
