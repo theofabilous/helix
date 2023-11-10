@@ -6,7 +6,7 @@ use crate::{
     input::KeyEvent,
     register::Registers,
     theme::{self, Theme},
-    tree::{self, Tabs, Tree},
+    tree::{self, Tab, TabMut, Tabs, Tree},
     view::ViewPosition,
     Align, Document, DocumentId, TabId, View, ViewId,
 };
@@ -1362,7 +1362,7 @@ impl Editor {
                     self.documents.remove(&id);
 
                     // Remove the scratch buffer from any jumplists
-                    for (view, _) in self.tabs.curr().views_mut() {
+                    for (view, _) in self.tabs.curr_mut().views_mut() {
                         view.remove_document(&id);
                     }
                 } else {
@@ -1639,7 +1639,7 @@ impl Editor {
             self.ensure_cursor_in_view(view_id);
 
             // Update jumplist selections with new document changes.
-            for (view, _focused) in self.tabs.curr().views_mut() {
+            for (view, _focused) in self.tabs.curr_mut().views_mut() {
                 let doc = doc_mut!(self, &view.doc);
                 view.sync_changes(doc);
             }
