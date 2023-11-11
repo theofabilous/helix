@@ -1399,8 +1399,7 @@ impl Editor {
                     .filter(|v| id == v.doc) // Different Document
                     .cloned()
                     .unwrap_or_else(|| View::new(id, self.config().gutters.clone()));
-                let view_id = self.tabs.split(
-                    self.tabs.focus,
+                let view_id = self.tabs.curr_mut().split(
                     view,
                     match action {
                         Action::HorizontalSplit => Layout::Horizontal,
@@ -1500,7 +1499,7 @@ impl Editor {
         for doc in self.documents_mut() {
             doc.remove_view(id);
         }
-        self.tabs.remove(self.tabs.focus, id);
+        self.tabs.curr_mut().remove(id);
         if self.tabs.curr().is_empty() && self.tabs.len() > 1 {
             self.tabs.close_tab(self.tabs.focus);
             // self.focus_prev();
@@ -1574,7 +1573,7 @@ impl Editor {
                 .next()
                 .unwrap_or_else(|| self.new_document(Document::default(self.config.clone())));
             let view = View::new(doc_id, self.config().gutters.clone());
-            let view_id = self.tabs.insert(self.tabs.focus, view);
+            let view_id = self.tabs.curr_mut().insert(view);
             let doc = doc_mut!(self, &doc_id);
             doc.ensure_view_init(view_id);
             doc.mark_as_focused();
@@ -1651,30 +1650,30 @@ impl Editor {
     }
 
     pub fn focus_next(&mut self) {
-        self.focus(self.tabs.next(self.tabs.focus));
+        self.focus(self.tabs.curr().next());
     }
 
     pub fn focus_prev(&mut self) {
-        self.focus(self.tabs.prev(self.tabs.focus));
+        self.focus(self.tabs.curr().prev());
     }
 
     pub fn focus_direction(&mut self, direction: tree::Direction) {
         let current_view = self.tabs.focused_view();
-        if let Some(id) =
-            self.tabs
-                .find_split_in_direction(self.tabs.focus, current_view, direction)
+        if let Some(id) = self
+            .tabs
+            .curr()
+            .find_split_in_direction(current_view, direction)
         {
             self.focus(id)
         }
     }
 
     pub fn swap_split_in_direction(&mut self, direction: tree::Direction) {
-        self.tabs
-            .swap_split_in_direction(self.tabs.focus, direction);
+        self.tabs.curr_mut().swap_split_in_direction(direction);
     }
 
     pub fn transpose_view(&mut self) {
-        self.tabs.transpose(self.tabs.focus);
+        self.tabs.curr_mut().transpose();
     }
 
     pub fn should_close(&self) -> bool {
