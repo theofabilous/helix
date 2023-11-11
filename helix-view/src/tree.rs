@@ -742,24 +742,20 @@ impl Tabs {
         false
     }
 
-    // I think this is fine as long as the keys in Tabs are not touched
-    // otherwise we have to collect into a vec..
-    pub unsafe fn for_each_tab_id_mut(&mut self, mut f: impl FnMut(&mut Self, TabId)) {
-        for key in (*(self as *mut Self)).trees.keys() {
-            f(self, key);
-        }
-    }
-
+    #[inline(always)]
     pub fn iter_tab_ids<'a>(&'a self) -> impl Iterator<Item = TabId> + Captures<&'a ()> {
         self.trees.keys()
     }
 
+    #[inline]
+    pub fn tab_ids(&self) -> Vec<TabId> {
+        self.iter_tab_ids().collect()
+    }
+
     pub fn resize(&mut self, area: Rect) -> bool {
         let mut result = false;
-        unsafe {
-            self.for_each_tab_id_mut(|this, key| {
-                result |= this.resize_tab(key, area);
-            });
+        for tab in self.tab_ids() {
+            result |= self.resize_tab(tab, area);
         }
         result
     }
@@ -768,7 +764,9 @@ impl Tabs {
     // i.e. only do it for the active tab, and recalc when
     // switching to a tab for which a recalc is needed
     pub fn recalculate(&mut self) {
-        unsafe { self.for_each_tab_id_mut(|this, tab| this.recalculate_tab(tab)) }
+        for tab in self.tab_ids() {
+            self.recalculate_tab(tab)
+        }
     }
 
     pub fn recalculate_tab(&mut self, tab: TabId) {
