@@ -420,7 +420,7 @@ impl Tabs {
     }
 
     #[inline]
-    pub fn curr(&self) -> TabProxy {
+    pub fn curr_tree(&self) -> TabProxy {
         let focus = self.focus;
         TabProxy {
             tabs: self,
@@ -429,7 +429,7 @@ impl Tabs {
     }
 
     #[inline]
-    pub fn curr_mut(&mut self) -> TabProxyMut {
+    pub fn curr_tree_mut(&mut self) -> TabProxyMut {
         let focus = self.focus;
         TabProxyMut {
             tabs: self,
@@ -1182,7 +1182,7 @@ mod test {
             width: 180,
             height: 80,
         });
-        let mut tree = tabs.curr_mut();
+        let mut tree = tabs.curr_tree_mut();
         let mut view = View::new(DocumentId::default(), GutterConfig::default());
         view.area = Rect::new(0, 0, 180, 80);
         tree.insert(view);
@@ -1241,7 +1241,7 @@ mod test {
         let doc_l0 = DocumentId::default();
         let mut view = View::new(doc_l0, GutterConfig::default());
         view.area = Rect::new(0, 0, 180, 80);
-        let mut tree = tabs.curr_mut();
+        let mut tree = tabs.curr_tree_mut();
         tree.insert(view);
         let l0 = tree.focused();
 

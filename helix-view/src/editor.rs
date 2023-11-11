@@ -1362,7 +1362,7 @@ impl Editor {
                     self.documents.remove(&id);
 
                     // Remove the scratch buffer from any jumplists
-                    for (view, _) in self.tabs.curr_mut().views_mut() {
+                    for (view, _) in self.tabs.curr_tree_mut().views_mut() {
                         view.remove_document(&id);
                     }
                 } else {
@@ -1399,7 +1399,7 @@ impl Editor {
                     .filter(|v| id == v.doc) // Different Document
                     .cloned()
                     .unwrap_or_else(|| View::new(id, self.config().gutters.clone()));
-                let view_id = self.tabs.curr_mut().split(
+                let view_id = self.tabs.curr_tree_mut().split(
                     view,
                     match action {
                         Action::HorizontalSplit => Layout::Horizontal,
@@ -1499,8 +1499,8 @@ impl Editor {
         for doc in self.documents_mut() {
             doc.remove_view(id);
         }
-        self.tabs.curr_mut().remove(id);
-        if self.tabs.curr().is_empty() && self.tabs.len() > 1 {
+        self.tabs.curr_tree_mut().remove(id);
+        if self.tabs.curr_tree().is_empty() && self.tabs.len() > 1 {
             self.tabs.close_tab(self.tabs.focus);
             // self.focus_prev();
         }
@@ -1573,7 +1573,7 @@ impl Editor {
                 .next()
                 .unwrap_or_else(|| self.new_document(Document::default(self.config.clone())));
             let view = View::new(doc_id, self.config().gutters.clone());
-            let view_id = self.tabs.curr_mut().insert(view);
+            let view_id = self.tabs.curr_tree_mut().insert(view);
             let doc = doc_mut!(self, &doc_id);
             doc.ensure_view_init(view_id);
             doc.mark_as_focused();
@@ -1638,7 +1638,7 @@ impl Editor {
             self.ensure_cursor_in_view(view_id);
 
             // Update jumplist selections with new document changes.
-            for (view, _focused) in self.tabs.curr_mut().views_mut() {
+            for (view, _focused) in self.tabs.curr_tree_mut().views_mut() {
                 let doc = doc_mut!(self, &view.doc);
                 view.sync_changes(doc);
             }
@@ -1650,18 +1650,18 @@ impl Editor {
     }
 
     pub fn focus_next(&mut self) {
-        self.focus(self.tabs.curr().next());
+        self.focus(self.tabs.curr_tree().next());
     }
 
     pub fn focus_prev(&mut self) {
-        self.focus(self.tabs.curr().prev());
+        self.focus(self.tabs.curr_tree().prev());
     }
 
     pub fn focus_direction(&mut self, direction: tree::Direction) {
         let current_view = self.tabs.focused_view();
         if let Some(id) = self
             .tabs
-            .curr()
+            .curr_tree()
             .find_split_in_direction(current_view, direction)
         {
             self.focus(id)
@@ -1669,11 +1669,11 @@ impl Editor {
     }
 
     pub fn swap_split_in_direction(&mut self, direction: tree::Direction) {
-        self.tabs.curr_mut().swap_split_in_direction(direction);
+        self.tabs.curr_tree_mut().swap_split_in_direction(direction);
     }
 
     pub fn transpose_view(&mut self) {
-        self.tabs.curr_mut().transpose();
+        self.tabs.curr_tree_mut().transpose();
     }
 
     pub fn should_close(&self) -> bool {

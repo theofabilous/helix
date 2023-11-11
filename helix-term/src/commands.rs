@@ -3093,7 +3093,7 @@ async fn make_format_callback(
     let format = format.await;
 
     let call: job::Callback = Callback::Editor(Box::new(move |editor| {
-        if !editor.documents.contains_key(&doc_id) || !editor.tabs.curr().contains(view_id) {
+        if !editor.documents.contains_key(&doc_id) || !editor.tabs.curr_tree().contains(view_id) {
             return;
         }
 
@@ -4986,7 +4986,7 @@ fn vsplit_new(cx: &mut Context) {
 }
 
 fn wclose(cx: &mut Context) {
-    if cx.editor.tabs.curr().views().count() == 1 {
+    if cx.editor.tabs.curr_tree().views().count() == 1 {
         if let Err(err) = typed::buffers_remaining_impl(cx.editor) {
             cx.editor.set_error(err.to_string());
             return;
@@ -5001,7 +5001,7 @@ fn wonly(cx: &mut Context) {
     let views = cx
         .editor
         .tabs
-        .curr()
+        .curr_tree()
         .views()
         .map(|(v, focus)| (v.id, focus))
         .collect::<Vec<_>>();
