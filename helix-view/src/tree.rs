@@ -1,6 +1,16 @@
 use crate::{graphics::Rect, TabId, View, ViewId};
 use slotmap::{HopSlotMap, SparseSecondaryMap};
 
+// TODO(theofabilous): put this in some more global module?
+// its likely useful in other places
+// NOTE: This is a workaround for, say:
+//    fn foo<'a>(arg: &'a T) -> impl MyTrait + 'a
+// which actually means that the return type *outlives* 'a
+// XXX: See: https://www.youtube.com/watch?v=CWiz_RtA1Hw&t=1527s
+// XXX: This will apparently change in a future version of rust
+pub trait Captures<U> {}
+impl<T: ?Sized, U> Captures<U> for T {}
+
 #[derive(Debug)]
 pub struct Tabs {
     trees: HopSlotMap<TabId, Tree>,
@@ -321,7 +331,10 @@ impl Tabs {
         }
     }
 
-    pub fn iter_view_ids<'a>(&'a self, tab: TabId) -> impl Iterator<Item = ViewId> + 'a {
+    pub fn iter_view_ids<'a>(
+        &'a self,
+        tab: TabId,
+    ) -> impl Iterator<Item = ViewId> + Captures<&'a ()> {
         self.get_tree(tab)
             .nodes
             .keys()
@@ -735,6 +748,10 @@ impl Tabs {
         for key in (*(self as *mut Self)).trees.keys() {
             f(self, key);
         }
+    }
+
+    pub fn iter_tab_ids<'a>(&'a self) -> impl Iterator<Item = TabId> + Captures<&'a ()> {
+        self.trees.keys()
     }
 
     pub fn resize(&mut self, area: Rect) -> bool {
