@@ -780,10 +780,10 @@ impl Tabs {
             _ => (),
         }
 
-        let tree = self.get_tree(tab);
+        let tree = self.get_tree_mut(tab);
         let root = tree.root;
         let area = tree.area;
-        let mut stack = tree.stack.clone();
+        let mut stack = std::mem::take(&mut tree.stack);
 
         stack.push((root, area));
 
